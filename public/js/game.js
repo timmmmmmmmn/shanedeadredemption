@@ -73,7 +73,11 @@ addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('mousemove', (e) => { if (locked || G.freeMouse) { mouse.dx += e.movementX; mouse.dy += e.movementY; } });
 canvas.addEventListener('mousedown', (e) => {
   initAudio();
-  if (!locked && (G.mode === 'play' || G.mode === 'duel' || G.mode === 'cut')) { canvas.requestPointerLock?.(); }
+  if (!locked && (G.mode === 'play' || G.mode === 'duel' || G.mode === 'cut')) {
+    canvas.requestPointerLock?.();
+    // deze klik vangt alleen de muis, het is geen schot (anders trek je in het duel 'te vroeg')
+    if (G.mode !== 'cut') return;
+  }
   if (e.button === 0) { mouse.l = true; mouse.lPressed = true; }
   if (e.button === 2) { mouse.r = true; mouse.rPressed = true; }
 });
@@ -1333,8 +1337,7 @@ function startDuel(S) {
     mo.hp = 1; mo.model.visible = false; mo.hidden = true; opps.push(mo);
   }
   for (const e of opps) { e.drawn = false; e.drawP = 0; e.yaw = Math.atan2(P.pos.x - e.pos.x, P.pos.z - e.pos.z); }
-  // vizier op de laarzen van de tegenstander: bij DRAW moet je zelf omhoog trekken
-  aimAt(V3(op.x, 0.15, op.z));
+  aimAt(V3(op.x, 1.2 * main.scale, op.z));
   G.duel = { D, opps, phase: 'intro', t: 0, marks: [], survive: !!D.survive };
   G.boss = null;
   music('duel');
@@ -1360,11 +1363,12 @@ function updateDuel(dtr) {
   du.t -= dtr;
   if (du.phase === 'wait') {
     G.timeScale = 1;
-    if (mouse.lPressed) { duelText('Te vroeg!', 'Je trok voor het signaal'); duelLose(); return; }
+    if (mouse.lPressed) { duelText('Nog niet!', 'Wacht op de bel'); sfx('click'); du.warned = 1.2; }
+    if (du.warned > 0 && (du.warned -= dtr) <= 0) duelText('Wacht op het signaal…', 'Niet te vroeg trekken');
     if (du.t <= 0) {
-      du.phase = 'draw'; du.t = du.D.draw + (du.D.guards || 0) * 0.55 + (du.D.extra ? 0.5 : 0); du.win = du.t;
+      du.phase = 'draw'; du.t = Math.max(3, du.D.draw * 1.7) + (du.D.guards || 0) * 0.9 + (du.D.extra ? 1.2 : 0); du.win = du.t;
       sfx('bell', 1);
-      duelText('DRAW!', 'Klik om doelen te markeren · rechtermuis om te vuren');
+      duelText('DRAW!', 'Klik op elke tegenstander · daarna rechtermuis of spatie');
       document.body.classList.add('deadeye');
       setSlow(true);
       for (const e of du.opps) if (e.hidden) { e.model.visible = true; e.hidden = false; subtitle('', 'Mo Hemmet trekt zijn revolver op het balkon!', 2.5); }
@@ -1378,6 +1382,17 @@ function updateDuel(dtr) {
       const wr = G.world.ray(camera.position, f, 150);
       const er = rayEnemies(camera.position, f, wr.t);
       if (er.e) { const p = camera.position.clone().addScaledVector(f, er.t); du.marks.push({ e: er.e, off: V3().subVectors(p, V3(er.e.pos.x, er.e.y0, er.e.pos.z)), head: er.head }); sfx('mark'); }
+      else {
+        // niet precies raak? de dichtstbijzijnde tegenstander bij het vizier telt ook
+        let best = null, bd = Math.min(innerWidth, innerHeight) * 0.16;
+        for (const e of du.opps) {
+          if (!e.alive || e.hidden) continue;
+          const q = proj(V3(e.pos.x, e.y0 + 1.25 * e.scale, e.pos.z));
+          const d = Math.hypot(q.x - innerWidth / 2, q.y - innerHeight / 2);
+          if (q.ok && d < bd) { bd = d; best = e; }
+        }
+        if (best) { du.marks.push({ e: best, off: V3(0, 1.25 * best.scale, 0), head: false }); sfx('mark'); }
+      }
     }
     if (mouse.rPressed || keys.Space || du.t <= 0 || du.marks.length >= 6) { du.phase = 'fire'; du.t = 0.05; }
   } else if (du.phase === 'fire') {
@@ -1945,6 +1960,25 @@ function drawHud() {
         if (i % 2) continue;
         const q = proj(p); if (q.ok) hx.fillRect(q.x - 2, q.y - 2, 4, 4);
       }
+    }
+  }
+  // duel: laat zien wie je nog moet raken (ook Mo op het balkon)
+  if (G.duel && G.duel.phase === 'draw') {
+    for (const e of G.duel.opps) {
+      if (!e.alive || e.hidden || G.duel.marks.some((m) => m.e === e)) continue;
+      const p = V3(e.pos.x, e.y0 + 1.25 * e.scale, e.pos.z);
+      const q = proj(p);
+      const on = q.ok && q.x > 20 && q.x < W - 20 && q.y > 20 && q.y < H - 20;
+      hx.strokeStyle = '#ff3020'; hx.fillStyle = '#ff3020'; hx.lineWidth = 2;
+      if (on) { hx.beginPath(); hx.arc(q.x, q.y, 16, 0, 7); hx.stroke(); }
+      else {
+        const v = p.clone().applyMatrix4(camera.matrixWorldInverse);
+        const a = Math.atan2(-v.y, v.x);
+        const ex = cx + Math.cos(a) * Math.min(W, H) * 0.38, ey = cy + Math.sin(a) * Math.min(W, H) * 0.38;
+        hx.save(); hx.translate(ex, ey); hx.rotate(a);
+        hx.beginPath(); hx.moveTo(14, 0); hx.lineTo(-8, -10); hx.lineTo(-8, 10); hx.fill(); hx.restore();
+      }
+      hx.lineWidth = 1;
     }
   }
   // Dead Eye markeringen
