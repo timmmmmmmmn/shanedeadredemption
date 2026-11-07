@@ -1332,9 +1332,9 @@ function startDuel(S) {
     g.hp = 1; opps.push(g);
   }
   if (D.extra === 'mo') {
-    const b = G.world.barInfo.balcony;
-    const mo = spawnEnemy('g', b.x, -4, { look: CAST.mo, name: 'Mo Hemmet', duel: true, y: b.y });
-    mo.hp = 1; mo.model.visible = false; mo.hidden = true; opps.push(mo);
+    // Mo staat gewoon op straat naast Tex, je ziet hem vanaf het begin
+    const mo = spawnEnemy('g', op.x + 3.2, op.z + 1.5, { look: CAST.mo, name: 'Mo Hemmet', duel: true });
+    mo.hp = 1; opps.push(mo);
   }
   for (const e of opps) { e.drawn = false; e.drawP = 0; e.yaw = Math.atan2(P.pos.x - e.pos.x, P.pos.z - e.pos.z); }
   aimAt(V3(op.x, 1.2 * main.scale, op.z));

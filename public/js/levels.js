@@ -272,7 +272,7 @@ export const BOSSES = {
 
 export const DUELS = {
   tex: { name: 'Big Tex Tolliver', look: 'tex', extra: 'mo', draw: 2.0,
-    pre: [['Big Tex Tolliver', 'Out here in the street, Shane. Face me like a man.'], ['Shane', 'Can I at least finish my chocomel first?'], ['Big Tex Tolliver', 'NO.']] },
+    pre: [['Big Tex Tolliver', 'Out here in the street, Shane. Face me like a man.'], ['Mo Hemmet', 'And me. The Hemmet gang always gets its money, Shane.'], ['Shane', 'Can I at least finish my chocomel first?'], ['Big Tex Tolliver', 'NO.']] },
   krul: { name: 'Sheriff Wilma Krul', look: { skin: '#e8c0a0', hair: 'long', hairColor: '#8a4a20', hat: 'cowboy', hatColor: '#3a2a1a', shirt: '#cfc4a8', vest: '#2a2a2a', pants: '#3a3226', coat: '#5a3a22' }, draw: 1.6,
     pre: [['Sheriff Wilma Krul', 'Last chance, Shane. Pay for those broodjes.'], ['Shane', 'Can\'t. Ate \'em.']] },
   kid: { name: 'The Bonuskaart Kid', look: { skin: '#f0c8a8', hair: 'short', hairColor: '#e0c060', hat: 'cowboy', hatColor: '#f0f0f0', shirt: '#c8202a', vest: '#f0f0f0', pants: '#1e2e5a' }, draw: 1.35, guards: 2,
