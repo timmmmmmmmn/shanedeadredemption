@@ -35,10 +35,10 @@ export const LEVELS = [
     intro: 'bar',
     sections: [
       { t: 'duel', len: 24, duel: 'tex' },
-      { t: 'fight', len: 60, obj: 'Overleef de Hatert Town gang', waves: ['g4', 'g3 R2', 'g3 s1'],
+      { t: 'fight', len: 60, obj: 'Overleef de Hatert Town gang', waves: ['g4', 'g3 r2', 'g3 s1'],
         say: [['Hatert Town Gang', 'They shot Mo Hemmet! Get that bun-headed sonofagun!'], ['Shane', 'Ah, come on. He drew first.']] },
       { t: 'escape', len: 70, obj: 'Vlucht naar de stallen', waves: ['g3', 'g2 s1', 'g3'], say: [['Shane', 'Two frikandelbroodjes. That\'s all it was. Two.']] },
-      { t: 'fight', len: 55, obj: 'Breek door de barricade bij de stadspoort', waves: ['g4 R2', 'g3 s2', 'b1 g3'],
+      { t: 'fight', len: 55, obj: 'Breek door de barricade bij de stadspoort', waves: ['g4 r2', 'g3 s2', 'b1 g3'],
         say: [['Hatert Town Gang', 'Nobody leaves Hatert Town, Shane!']] },
     ],
     outro: [['Shane', 'Hatert Town. Fifty Fifty. Best chocomel west of the Maas.'], ['Shane', 'Gonna miss it.']],

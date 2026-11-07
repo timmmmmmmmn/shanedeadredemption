@@ -1,6 +1,6 @@
 # Shane Dead Redemption
 
-Een western in PS1-stijl in de browser. Shane heeft twee frikandelbroodjes gestolen bij de Plus
+Een western in de browser. Shane heeft twee frikandelbroodjes gestolen bij de Plus
 General Store in Hatert Town. Nu staat er een premie op zijn hoofd en moet hij het land uit vluchten,
 naar de grens bij Kleve.
 
@@ -12,6 +12,5 @@ Speel: https://shanedeadredemption.timvanbergen.nl
 
 Besturing: WASD, muis, rechtermuis = richten, Q = Dead Eye, C = bukken, R = herladen, 1–5 = wapen.
 
-Techniek: three.js zonder build-stap, met een eigen PS1-renderer (vertex snapping, affiene textures,
-15-bit kleur met dither). Alle geluid en muziek worden live gemaakt met WebAudio.
+Techniek: three.js zonder build-stap, met schaduwen, ACES tone mapping en zelfgetekende textures. Alle geluid en muziek worden live gemaakt met WebAudio.
 Deploy: `npx wrangler deploy` (Cloudflare Workers met statische assets).

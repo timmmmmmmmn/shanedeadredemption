@@ -1,11 +1,10 @@
 import * as THREE from './three.module.min.js';
-import { patchPSX, rng } from './psx.js';
+import { rng } from './psx.js';
 import { makeHuman, animHuman, setGun, makeHorse, animHorse, CAST, goonLook, mat, box } from './chars.js';
 import { World } from './world.js';
 import { LEVELS, WEAPONS, WEAPON_ORDER, ENEMY, BOSSES, DUELS, bountyFor } from './levels.js';
 import { initAudio, sfx, music, setSlow, vol, setVolumes } from './audio.js';
 
-patchPSX();
 const $ = (s) => document.querySelector(s);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -26,7 +25,7 @@ const save = (() => {
   s = s || {};
   s.unlocked = s.unlocked || 0;
   s.best = s.best || {};
-  s.set = Object.assign({ sens: 1, invert: false, sfx: 0.8, music: 0.5, diff: 1, res: 240 }, s.set || {});
+  s.set = Object.assign({ sens: 1, invert: false, sfx: 0.8, music: 0.5, diff: 1, gfx: 2 }, s.set || {});
   if (/[?&]alles/.test(location.search)) s.unlocked = LEVELS.length - 1;
   return s;
 })();
@@ -37,15 +36,19 @@ vol.sfx = save.set.sfx; vol.music = save.set.music;
 //  renderer
 // =====================================================================
 const canvas = $('#c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(1);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const GFX_SCALE = [0.6, 0.85, 1];
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 160);
 const hud = $('#hud'), hx = hud.getContext('2d');
 function resize() {
   const w = innerWidth, h = innerHeight;
-  const k = save.set.res / h;
-  renderer.setSize(Math.round(w * k), Math.round(h * k), false);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5) * (GFX_SCALE[save.set.gfx] ?? 1));
+  renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
   hud.width = w * Math.min(2, devicePixelRatio); hud.height = h * Math.min(2, devicePixelRatio);
   hx.setTransform(Math.min(2, devicePixelRatio), 0, 0, Math.min(2, devicePixelRatio), 0, 0);
@@ -54,7 +57,7 @@ addEventListener('resize', resize);
 resize();
 const muzzleLight = new THREE.PointLight('#ffcc66', 0, 9, 1.5);
 scene.add(muzzleLight);
-const lantern = new THREE.PointLight('#ffd9a0', 0, 14, 1.2);
+const lantern = new THREE.PointLight('#ffd9a0', 0, 16, 1);
 scene.add(lantern);
 const boomLight = new THREE.PointLight('#ff9a40', 0, 22, 1.2);
 scene.add(boomLight);
@@ -107,12 +110,19 @@ window.__sdr = G;
 //  effecten: deeltjes, sporen, mondingsvuur
 // =====================================================================
 const PART_N = 700;
+const softDot = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
 function partSystem(size) {
   const g = new THREE.BufferGeometry();
   const pos = new Float32Array(PART_N * 3), col = new Float32Array(PART_N * 3);
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const m = new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: true, fog: true });
+  const m = new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: true, fog: true, map: softDot, transparent: true, depthWrite: false, alphaTest: 0.02 });
   const pts = new THREE.Points(g, m);
   pts.frustumCulled = false;
   scene.add(pts);
@@ -178,16 +188,20 @@ function tracer(a, b) {
   t.l.visible = true; t.life = 0.06;
 }
 const flashTex = (() => {
-  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
   const x = c.getContext('2d');
-  x.fillStyle = '#fff2a0';
-  x.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, r = i % 2 ? 3 : 8; x.lineTo(8 + Math.cos(a) * r, 8 + Math.sin(a) * r); } x.fill();
-  x.fillStyle = '#ffffff'; x.fillRect(6, 6, 4, 4);
-  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
+  x.globalCompositeOperation = 'lighter';
+  for (let k = 0; k < 2; k++) {
+    x.fillStyle = k ? 'rgba(255,255,230,0.9)' : 'rgba(255,170,60,0.75)';
+    x.beginPath(); for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, r = i % 2 ? 8 - k * 3 : 30 - k * 12; x.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } x.fill();
+  }
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 14); g.addColorStop(0, '#fff'); g.addColorStop(1, 'rgba(255,220,150,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
 const flashes = [];
 for (let i = 0; i < 10; i++) {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, transparent: true, depthWrite: false, fog: false }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
   s.visible = false; scene.add(s); flashes.push({ s, life: 0 });
 }
 let flashI = 0;
@@ -1627,7 +1641,14 @@ function buildLevel(li) {
   G.li = li; G.level = LEVELS[li];
   lookR = rng(G.level.seed * 31 + 7);
   G.world = new World(scene, G.level, li);
-  lantern.intensity = G.world.time.lantern ? 2.2 : 0;
+  lantern.intensity = G.world.time.lantern ? 6 : 0;
+  const sun = G.world.sun;
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(save.set.gfx >= 2 ? 2048 : 1024, save.set.gfx >= 2 ? 2048 : 1024);
+  Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 120 });
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.03;
+  scene.add(sun.target);
   camera.far = G.world.fogFar + 10; camera.updateProjectionMatrix();
   if (G.world.time.rain) { rain = makeRain(); scene.add(rain); }
   if (!P.model) makePlayer();
@@ -1654,9 +1675,8 @@ async function startLevel(li) {
   canvas.requestPointerLock?.();
   const L = G.level;
   await runCut(async () => {
-    await wait(0.3);
     if (L.intro === 'bar') await barIntro();
-    else { await wait(2.6); await genericIntro(L.intro || []); }
+    else { G.orbit = { a: 0.6, r: 4.2, h: 1.9 }; await wait(2.9); await genericIntro(L.intro || []); }
   });
   G.cutPose = null;
   setGun(P.model, gunFor(P.weapon));
@@ -1846,7 +1866,7 @@ function bindUi() {
   bind('#set-sfx', 'sfx', (v) => Math.round(v * 100) + '%', () => { vol.sfx = S.sfx; setVolumes(); });
   bind('#set-music', 'music', (v) => Math.round(v * 100) + '%', () => { vol.music = S.music; setVolumes(); });
   bind('#set-diff', 'diff', (v) => ['Makkelijk', 'Normaal', 'Zwaar'][v]);
-  bind('#set-res', 'res', (v) => ({ 240: 'PS1 (240p)', 360: 'Scherper (360p)', 480: 'Scherp (480p)' }[v] || v + 'p'), resize);
+  bind('#set-gfx', 'gfx', (v) => ['Laag', 'Normaal', 'Hoog'][v], resize);
   const inv = $('#set-invert'); inv.checked = S.invert; inv.addEventListener('change', () => { S.invert = inv.checked; store(); });
 }
 
@@ -2141,6 +2161,10 @@ function loop(now) {
     if (G.world.time.rain && Math.random() < dtr * 0.08) { G.world.hemi.intensity = 6; setTimeout(() => sfx('thunder', 0.7), 600); }
     if (G.world.time.rain) G.world.hemi.intensity = lerp(G.world.hemi.intensity, G.world.time.hemi[2], 1 - Math.exp(-dtr * 6));
     G.world.sky.position.copy(camera.position);
+    // schaduwvak volgt de speler (of de camera in het menu)
+    const fp = G.mode === 'menu' ? V3(0, 0, -16) : P.pos;
+    G.world.sun.target.position.set(fp.x, 0, fp.z - 8);
+    G.world.sun.position.set(fp.x - 22, 40, fp.z + 14 - 8);
   }
   G.bossHit = Math.max(0, (G.bossHit || 0) - dtr);
   updateCamera(dtr);

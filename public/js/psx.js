@@ -99,20 +99,36 @@ export function patchPSX() {
 
 export function psxTex(t, repeat) {
   t.colorSpace = THREE.SRGBColorSpace;
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestMipmapNearestFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
   t.generateMipmaps = true;
+  t.anisotropy = 8;
   if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
   return t;
 }
 
 // kleine textures, getekend op een canvas
+// getekend in de oude maat, maar op een 4x groter canvas, met fijne korrel erover voor detail
 export function canvasTex(w, h, draw, repeat = true) {
+  const K = Math.max(1, Math.min(4, Math.floor(512 / Math.max(w, h))));
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  c.width = w * K; c.height = h * K;
   const x = c.getContext('2d');
-  x.imageSmoothingEnabled = false;
+  x.imageSmoothingEnabled = true;
+  x.save(); x.scale(K, K);
   draw(x, w, h);
+  x.restore();
+  if (K > 1) {
+    x.filter = 'blur(' + (K * 0.35) + 'px)';
+    x.drawImage(c, 0, 0);
+    x.filter = 'none';
+    const n = c.width * c.height / 6;
+    for (let i = 0; i < n; i++) {
+      const v = Math.random();
+      x.fillStyle = v < 0.5 ? `rgba(0,0,0,${0.05 + v * 0.08})` : `rgba(255,245,230,${(v - 0.5) * 0.09})`;
+      x.fillRect(Math.random() * c.width | 0, Math.random() * c.height | 0, 1, 1);
+    }
+  }
   return psxTex(new THREE.CanvasTexture(c), repeat);
 }
 

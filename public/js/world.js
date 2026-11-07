@@ -17,12 +17,33 @@ function tbox(w, h, d, t, s = 2) {
 export const TIMES = {
   day: { bg: '#e8d4ac', top: '#7fb0d8', fog: [30, 130], hemi: ['#fff2dc', '#8a6a48', 2.1], sun: ['#fff0d0', 2.3] },
   dusk: { bg: '#e0905e', top: '#5a4a7a', fog: [25, 110], hemi: ['#ffc8a0', '#4a3028', 1.7], sun: ['#ffa060', 2.0] },
-  night: { bg: '#18203a', top: '#05070f', fog: [10, 60], hemi: ['#6a7aaa', '#1a1410', 1.3], sun: ['#8090c0', 0.7], lantern: true },
+  night: { bg: '#1c2644', top: '#070a16', fog: [12, 65], hemi: ['#8090c8', '#2a2018', 2.6], sun: ['#9aaad8', 1.4], lantern: true },
   dawn: { bg: '#eab8a0', top: '#8aa0c8', fog: [25, 120], hemi: ['#ffd8d0', '#5a4a48', 1.8], sun: ['#ffc8a8', 1.8] },
-  fog: { bg: '#a4aca2', top: '#8a948a', fog: [5, 40], hemi: ['#d0d8d0', '#5a5a48', 1.9], sun: ['#e0e8e0', 0.7] },
-  storm: { bg: '#4e565e', top: '#262a30', fog: [12, 70], hemi: ['#9aaab8', '#3a3430', 1.5], sun: ['#b0c0d0', 0.6], rain: true },
-  cave: { bg: '#0b0907', top: '#0b0907', fog: [5, 36], hemi: ['#6a5a4a', '#1a1410', 0.9], sun: ['#ffd8a0', 0.2], lantern: true },
+  fog: { bg: '#a4aca2', top: '#8a948a', fog: [6, 42], hemi: ['#d0d8d0', '#5a5a48', 2.3], sun: ['#e0e8e0', 1.0] },
+  storm: { bg: '#4e565e', top: '#262a30', fog: [12, 70], hemi: ['#9aaab8', '#3a3430', 2.2], sun: ['#b0c0d0', 1.0], rain: true },
+  cave: { bg: '#0b0907', top: '#0b0907', fog: [6, 38], hemi: ['#8a7a64', '#2a2018', 2.0], sun: ['#ffd8a0', 0.5], lantern: true },
 };
+
+// ronde, onregelmatige klont (rotsen, bladeren) in plaats van een kale dodecaëder
+const blobCache = [];
+function blob(r, _d) {
+  const k = blobCache.length < 12 ? blobCache.length : Math.floor(Math.random() * 12);
+  if (!blobCache[k]) {
+    const g = new THREE.IcosahedronGeometry(1, 2);
+    const p = g.attributes.position, seen = new Map();
+    for (let i = 0; i < p.count; i++) {
+      const key = `${p.getX(i).toFixed(3)},${p.getY(i).toFixed(3)},${p.getZ(i).toFixed(3)}`;
+      if (!seen.has(key)) seen.set(key, 0.85 + Math.random() * 0.3);
+      const f = seen.get(key);
+      p.setXYZ(i, p.getX(i) * f, p.getY(i) * f, p.getZ(i) * f);
+    }
+    g.computeVertexNormals();
+    blobCache[k] = g;
+  }
+  const g = blobCache[k].clone();
+  g.scale(r, r, r);
+  return g;
+}
 
 const THEMES = {
   town: { ground: 'road', edge: 'sand', hw: 8, side: 'buildings', style: 'wood', props: ['barrel', 'crate', 'wagon', 'trough', 'hay', 'crate', 'barrel'] },
@@ -243,7 +264,7 @@ export class World {
       let z = z0;
       while (z > z1) {
         const w = 5 + r() * 7, h = 6 + r() * 10, d = 6 + r() * 6;
-        const g = new THREE.DodecahedronGeometry(1, 0);
+        const g = blob(1, 0);
         const m = new THREE.Mesh(g, mat('#ffffff', tex(rt)));
         m.scale.set(d / 2, h / 2, w / 2);
         this.add(m, side * (this.hw + d / 2 - 0.5), h / 2 - 1, z - w / 2, r() * 3);
@@ -317,7 +338,7 @@ export class World {
     for (const side of [-1, 1]) {
       for (let z = z0; z > z1; z -= 3 + r() * 3) {
         const w = 3 + r() * 4, h = 6;
-        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), mat('#ffffff', tex('cave')));
+        const m = new THREE.Mesh(blob(1, 0), mat('#ffffff', tex('cave')));
         m.scale.set(2.5, h / 2, w / 2);
         this.add(m, side * (this.hw + 1.8), h / 2 - 0.5, z, r() * 3);
       }
@@ -339,7 +360,7 @@ export class World {
     for (const side of [-1, 1]) {
       for (let z = z0; z > z1; z -= 0.6) {
         const h = 4.2 + r() * 0.6;
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, h, 5), mat('#8a6a48', tex('bark')));
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, h, 16), mat('#8a6a48', tex('bark')));
         this.add(m, side * (this.hw + 0.3), h / 2, z);
       }
       for (let z = z0 - 15; z > z1; z -= 22 + r() * 8) this.tower(side * (this.hw - 1.5), z, 4.5);
@@ -391,7 +412,7 @@ export class World {
     }
     // plassen (geen botsing)
     for (let z = z0; z > z1; z -= 10) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(1.5 + r() * 2, 7), new THREE.MeshLambertMaterial({ map: tex('water') }));
+      const m = new THREE.Mesh(new THREE.CircleGeometry(1.5 + r() * 2, 20), new THREE.MeshLambertMaterial({ map: tex('water') }));
       m.rotation.x = -Math.PI / 2;
       this.add(m, (r() - 0.5) * this.hw * 1.6, 0.02, z, 0);
     }
@@ -406,7 +427,7 @@ export class World {
     for (let z = z0; z > this.endZ - 40; z -= 25 + r() * 20) {
       for (const side of [-1, 1]) {
         const h = 12 + r() * 25, w = 20 + r() * 30;
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.4, w * 0.6, h, 6), mat(col, tex(rt)));
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.4, w * 0.6, h, 16), mat(col, tex(rt)));
         this.add(m, side * (this.hw + 45 + r() * 30), h / 2 - 2, z, r() * 3);
       }
     }
@@ -450,7 +471,7 @@ export class World {
       }
       case 'barrel': {
         for (let i = 0; i < 1 + Math.floor(r() * 3); i++) {
-          const m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.05, 8), mat('#ffffff', tex('barrel')));
+          const m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.05, 16), mat('#ffffff', tex('barrel')));
           const bx = x + i * 0.85, bz = z + (r() - 0.5) * 0.4;
           this.add(m, bx, 0.525, bz);
           this.solid(bx, bz, 0.8, 0.8, 1.05);
@@ -463,7 +484,7 @@ export class World {
         this.boxAt(w, 0.9, d, 'planks', x, 0.55, z, 2, false);
         this.solid(x, z, w, d, 1.45);
         for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-          const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.12, 8), mat('#5a3a20', tex('planksDark')));
+          const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.12, 16), mat('#5a3a20', tex('planksDark')));
           wh.rotation.z = Math.PI / 2; if (ry) wh.rotation.set(Math.PI / 2, 0, 0);
           this.add(wh, x + (ry ? a * 1.2 : a * 0.95), 0.55, z + (ry ? b * 0.95 : b * 1.2), wh.rotation.y);
         }
@@ -472,7 +493,7 @@ export class World {
       }
       case 'trough': this.boxAt(2.4, 0.7, 0.8, 'planksDark', x, 0, z, 2, true); break;
       case 'hay': {
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.4, 8), mat('#ffffff', tex('hay')));
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1.4, 16), mat('#ffffff', tex('hay')));
         m.rotation.z = Math.PI / 2;
         this.add(m, x, 0.8, z);
         this.solid(x, z, 1.4, 1.6, 1.6);
@@ -487,7 +508,7 @@ export class World {
       }
       case 'boulder': {
         const s = 0.8 + r() * 0.9;
-        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), mat('#ffffff', tex(this.th.rock || 'rockgrey')));
+        const m = new THREE.Mesh(blob(s, 0), mat('#ffffff', tex(this.th.rock || 'rockgrey')));
         m.scale.y = 0.75;
         this.add(m, x, s * 0.5, z, r() * 3);
         this.solid(x, z, s * 1.6, s * 1.6, s * 1.25);
@@ -505,7 +526,7 @@ export class World {
       case 'tree': this.tree(x, z, 0.9 + r() * 0.5, true); break;
       case 'pine': this.pine(x, z, 0.8 + r() * 0.4, true); break;
       case 'log': {
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 4, 7), mat('#ffffff', tex('bark')));
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 4, 16), mat('#ffffff', tex('bark')));
         m.rotation.z = Math.PI / 2;
         this.add(m, x, 0.4, z);
         this.solid(x, z, 4, 0.9, 0.85);
@@ -527,11 +548,11 @@ export class World {
       }
       case 'cannon': {
         this.boxAt(1.2, 0.5, 1.6, 'planksDark', x, 0.3, z, 2, false);
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.2, 7), mat('#3a3a3a', tex('metal')));
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.2, 16), mat('#3a3a3a', tex('metal')));
         m.rotation.x = Math.PI / 2 - 0.15;
         this.add(m, x, 1.0, z + 0.4);
         for (const s of [-1, 1]) {
-          const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.12, 8), mat('#5a3a20'));
+          const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.12, 16), mat('#5a3a20'));
           wh.rotation.z = Math.PI / 2;
           this.add(wh, x + s * 0.7, 0.55, z);
         }
@@ -552,16 +573,16 @@ export class World {
 
   tree(x, z, s, coll) {
     const r = this.r;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 3 * s, 6), mat('#ffffff', tex('bark')));
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * s, 0.28 * s, 3 * s, 16), mat('#ffffff', tex('bark')));
     this.add(trunk, x, 1.5 * s, z);
     for (let i = 0; i < 2; i++) {
-      const c = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5 * s - i * 0.4, 0), mat(this.level.theme === 'forest' ? '#6a8a50' : '#9aaa60', tex('leaves')));
+      const c = new THREE.Mesh(blob(1.5 * s - i * 0.4, 0), mat(this.level.theme === 'forest' ? '#6a8a50' : '#9aaa60', tex('leaves')));
       this.add(c, x + (r() - 0.5) * 0.6, 3.2 * s + i * 0.9 * s, z + (r() - 0.5) * 0.6, r() * 3);
     }
     if (coll) this.solid(x, z, 0.6 * s, 0.6 * s, 3);
   }
   pine(x, z, s, coll) {
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * s, 0.22 * s, 2 * s, 5), mat('#ffffff', tex('bark')));
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * s, 0.22 * s, 2 * s, 16), mat('#ffffff', tex('bark')));
     this.add(trunk, x, s, z);
     for (let i = 0; i < 3; i++) {
       const c = new THREE.Mesh(new THREE.ConeGeometry((1.8 - i * 0.45) * s, 2 * s, 6), mat(this.level.theme === 'snow' ? '#c0d0c0' : '#ffffff', tex('pine')));
@@ -571,10 +592,10 @@ export class World {
   }
   deadtree(x, z) {
     const r = this.r;
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, 3.4, 5), mat('#ffffff', tex('bark')));
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, 3.4, 16), mat('#ffffff', tex('bark')));
     this.add(m, x, 1.7, z);
     for (let i = 0; i < 3; i++) {
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, 1.4, 4), mat('#ffffff', tex('bark')));
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, 1.4, 16), mat('#ffffff', tex('bark')));
       b.rotation.z = (r() - 0.5) * 2; b.rotation.x = (r() - 0.5);
       this.add(b, x + (r() - 0.5) * 0.6, 2 + i * 0.5, z, b.rotation.y);
       b.rotation.z = (r() - 0.5) * 2;
@@ -620,9 +641,9 @@ export class World {
   }
   waterTower(x, z) {
     for (const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) this.boxAt(0.25, 6, 0.25, 'planksDark', x + a * 1.4, 0, z + b * 1.4, 2, false);
-    const m = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 3, 10), mat('#ffffff', tex('barrel')));
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 3, 16), mat('#ffffff', tex('barrel')));
     this.add(m, x, 7.5, z);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.3, 1.2, 10), mat('#ffffff', tex('roof')));
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.3, 1.2, 16), mat('#ffffff', tex('roof')));
     this.add(roof, x, 9.6, z);
     this.solid(x, z, 3, 3, 6);
   }
@@ -738,10 +759,10 @@ export class World {
     const S = this.sections.find((s) => s.s.t === 'defend');
     const z = S ? (S.start + S.end) / 2 : -60;
     const x = -this.hw + 4;
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 9, 8), mat('#ffffff', tex('brick')));
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(2, 3, 9, 16), mat('#ffffff', tex('brick')));
     this.add(body, x, 4.5, z);
     this.solid(x, z, 5, 5, 9);
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(2.4, 2, 8), mat('#ffffff', tex('roof')));
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(2.4, 2, 16), mat('#ffffff', tex('roof')));
     this.add(cap, x, 10, z);
     const wings = new THREE.Group();
     for (let i = 0; i < 4; i++) {
@@ -792,7 +813,7 @@ export class World {
       x.fillText('$$$ REWARD $$$', 24, 63);
     };
     draw(null);
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter;
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
     img.onload = () => { draw(img); t.needsUpdate = true; };
     img.src = 'img/shane-face.png';
     const m = new THREE.MeshLambertMaterial({ map: t });
@@ -845,6 +866,8 @@ export class World {
       this.group.add(new THREE.Mesh(g, mm));
     }
     void keep;
+    this.group.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+    this.dyn.traverse((m) => { if (m.isMesh && !m.material.isMeshBasicMaterial) { m.receiveShadow = true; if (m.geometry.type !== 'PlaneGeometry') m.castShadow = true; } });
   }
 
   dispose() {

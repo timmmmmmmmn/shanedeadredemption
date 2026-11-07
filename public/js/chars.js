@@ -13,8 +13,29 @@ export function mat(color, map, extra) {
   if (!matC.has(k)) matC.set(k, new THREE.MeshLambertMaterial({ color, map: map || null, ...extra }));
   return matC.get(k);
 }
+// afgeronde doos: hoeken worden bolletjes, zodat mensen niet uit blokken bestaan
+const rboxG = new Map();
+export function rbox(w, h, d, round = 0.42) {
+  const k = `${w},${h},${d},${round}`;
+  if (rboxG.has(k)) return rboxG.get(k);
+  const g = new THREE.BoxGeometry(w, h, d, 5, 5, 5);
+  const r = Math.min(w, h, d) * round;
+  const p = g.attributes.position, v = new THREE.Vector3(), inner = new THREE.Vector3();
+  const hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r;
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    inner.set(Math.max(-hx, Math.min(hx, v.x)), Math.max(-hy, Math.min(hy, v.y)), Math.max(-hz, Math.min(hz, v.z)));
+    v.sub(inner);
+    if (v.lengthSq() > 1e-10) v.normalize().multiplyScalar(r);
+    v.add(inner);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  rboxG.set(k, g);
+  return g;
+}
 function part(w, h, d, m, x = 0, y = 0, z = 0) {
-  const o = new THREE.Mesh(box(w, h, d), m);
+  const o = new THREE.Mesh(rbox(w, h, d), m);
   o.position.set(x, y, z);
   return o;
 }
@@ -23,33 +44,56 @@ function part(w, h, d, m, x = 0, y = 0, z = 0) {
 let shaneFace = null;
 function faceTex(o) {
   if (o.photo) {
-    if (!shaneFace) shaneFace = psxTex(new THREE.TextureLoader().load(o.photo));
+    // foto zacht laten overlopen in de huidkleur, zodat het geen sticker lijkt
+    if (!shaneFace) {
+      const c = document.createElement('canvas'); c.width = c.height = 256;
+      const x = c.getContext('2d');
+      x.fillStyle = o.skin; x.fillRect(0, 0, 256, 256);
+      shaneFace = psxTex(new THREE.CanvasTexture(c));
+      const img = new Image();
+      img.onload = () => {
+        const m = document.createElement('canvas'); m.width = m.height = 256;
+        const mx = m.getContext('2d');
+        mx.drawImage(img, -20, -14, 296, 296);
+        mx.globalCompositeOperation = 'destination-in';
+        const g = mx.createRadialGradient(128, 136, 70, 128, 136, 128);
+        g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        mx.fillStyle = g; mx.fillRect(0, 0, 256, 256);
+        x.drawImage(m, 0, 0);
+        shaneFace.needsUpdate = true;
+      };
+      img.src = o.photo;
+    }
     return shaneFace;
   }
   const key = JSON.stringify([o.skin, o.beard, o.beardColor, o.brow, o.hairColor, o.scar, o.stache]);
   faceTex.c = faceTex.c || {};
   if (faceTex.c[key]) return faceTex.c[key];
-  const t = canvasTex(32, 32, (x) => {
-    x.fillStyle = o.skin; x.fillRect(0, 0, 32, 32);
-    x.fillStyle = 'rgba(0,0,0,0.12)'; x.fillRect(0, 26, 32, 6);
-    // ogen
-    x.fillStyle = '#f2efe6'; x.fillRect(7, 12, 6, 3); x.fillRect(19, 12, 6, 3);
-    x.fillStyle = '#2a1a10'; x.fillRect(9, 12, 3, 3); x.fillRect(21, 12, 3, 3);
-    // wenkbrauwen
-    x.fillStyle = o.brow || o.hairColor || '#2a1a10';
-    x.fillRect(6, 9, 8, o.thickBrow ? 3 : 2); x.fillRect(18, 9, 8, o.thickBrow ? 3 : 2);
-    // neus
-    x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(15, 14, 3, 7);
-    // mond
-    x.fillStyle = '#6a2c22'; x.fillRect(11, 23, 10, 2);
-    if (o.beard) {
-      x.fillStyle = o.beardColor || '#2a1a10';
-      x.fillRect(0, 20, 32, 12); x.fillRect(0, 14, 4, 8); x.fillRect(28, 14, 4, 8);
-      x.fillStyle = '#4a2018'; x.fillRect(12, 23, 8, 2);
-    }
-    if (o.stache) { x.fillStyle = o.beardColor || '#2a1a10'; x.fillRect(9, 20, 14, 3); }
-    if (o.scar) { x.fillStyle = '#c66'; x.fillRect(22, 6, 1, 14); }
-  }, false);
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const ell = (cx, cy, rx, ry, col) => { x.fillStyle = col; x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, 7); x.fill(); };
+  x.fillStyle = o.skin; x.fillRect(0, 0, 128, 128);
+  const g = x.createRadialGradient(64, 60, 20, 64, 64, 90); g.addColorStop(0, 'rgba(255,230,210,0.15)'); g.addColorStop(1, 'rgba(60,30,20,0.35)');
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  // ogen
+  for (const ex of [40, 88]) { ell(ex, 54, 11, 6, '#f2efe6'); ell(ex, 54, 5, 5.5, '#4a3020'); ell(ex, 54, 2.5, 2.5, '#111'); ell(ex - 1.5, 52.5, 1.2, 1.2, '#fff'); }
+  // wenkbrauwen
+  x.strokeStyle = o.brow || o.hairColor || '#2a1a10'; x.lineWidth = o.thickBrow ? 7 : 4.5; x.lineCap = 'round';
+  for (const ex of [40, 88]) { x.beginPath(); x.moveTo(ex - 12, 42); x.quadraticCurveTo(ex, 36, ex + 12, 41); x.stroke(); }
+  // neus
+  x.fillStyle = 'rgba(80,40,20,0.25)'; x.beginPath(); x.moveTo(64, 56); x.lineTo(57, 80); x.quadraticCurveTo(64, 84, 71, 80); x.closePath(); x.fill();
+  // mond
+  x.strokeStyle = '#7a3428'; x.lineWidth = 4; x.beginPath(); x.moveTo(50, 96); x.quadraticCurveTo(64, 101, 78, 96); x.stroke();
+  if (o.beard) {
+    x.fillStyle = o.beardColor || '#2a1a10';
+    x.beginPath(); x.moveTo(0, 70); x.quadraticCurveTo(10, 128, 64, 130); x.quadraticCurveTo(118, 128, 128, 70); x.lineTo(128, 128); x.lineTo(0, 128); x.fill();
+    x.beginPath(); x.ellipse(64, 86, 22, 7, 0, 0, 7); x.fill();
+    x.globalAlpha = 0.25; for (let i = 0; i < 300; i++) x.fillRect(Math.random() * 128, 70 + Math.random() * 58, 2, 2); x.globalAlpha = 1;
+    ell(64, 99, 11, 3.5, '#5a2018');
+  }
+  if (o.stache) { x.fillStyle = o.beardColor || '#2a1a10'; x.beginPath(); x.ellipse(56, 88, 13, 5, 0.2, 0, 7); x.ellipse(72, 88, 13, 5, -0.2, 0, 7); x.fill(); }
+  if (o.scar) { x.strokeStyle = '#c66'; x.lineWidth = 2; x.beginPath(); x.moveTo(90, 26); x.lineTo(94, 76); x.stroke(); }
+  const t = psxTex(new THREE.CanvasTexture(c));
   faceTex.c[key] = t;
   return t;
 }
@@ -99,7 +143,7 @@ export function makeHuman(o) {
   const neck = new THREE.Group(); neck.position.y = 0.64; torso.add(neck);
   const head = new THREE.Group(); neck.add(head);
   const hm = [skin, skin, skin, skin, mat('#ffffff', faceTex(o)), skin];
-  const hd = new THREE.Mesh(box(0.26, 0.3, 0.27), hm); hd.position.y = 0.17; head.add(hd);
+  const hd = new THREE.Mesh(rbox(0.26, 0.3, 0.27, 0.45), hm); hd.position.y = 0.17; head.add(hd);
   const hc = mat(o.hairColor || '#3a2414');
   const hair = o.hair || 'short';
   if (hair !== 'bald') {
@@ -109,9 +153,9 @@ export function makeHuman(o) {
     if (hair === 'long') head.add(part(0.28, 0.32, 0.06, hc, 0, 0.12, -0.13));
     if (hair === 'bun') {
       // man bun met krullen, zoals op de foto
-      head.add(part(0.15, 0.13, 0.15, hc, 0, 0.44, -0.04));
-      head.add(part(0.1, 0.07, 0.11, hc, 0.04, 0.52, -0.02));
-      head.add(part(0.08, 0.06, 0.08, hc, -0.05, 0.5, -0.07));
+      for (const [bx, by, bz, br] of [[0, 0.44, -0.04, 0.085], [0.045, 0.5, -0.02, 0.055], [-0.05, 0.49, -0.07, 0.05], [0.02, 0.41, -0.1, 0.06]]) {
+        const b = new THREE.Mesh(new THREE.IcosahedronGeometry(br, 1), hc); b.position.set(bx, by, bz); head.add(b);
+      }
     }
   }
   if (o.beard) head.add(part(0.27, 0.12, 0.08, mat(o.beardColor || '#2a1a10'), 0, 0.04, 0.12));
@@ -119,10 +163,12 @@ export function makeHuman(o) {
   if (o.hat) {
     const hm2 = mat(o.hatColor || '#5a4030');
     const brim = o.hat === 'stetson' ? 0.6 : o.hat === 'bowler' ? 0.36 : 0.46;
-    head.add(part(brim, 0.03, brim * 0.92, hm2, 0, 0.35, 0));
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(brim / 2, brim / 2, 0.025, 24), hm2);
+    rim.position.y = 0.34; rim.scale.z = 0.9; head.add(rim);
     const crownH = o.hat === 'stetson' ? 0.2 : 0.15;
-    head.add(part(0.28, crownH, 0.28, hm2, 0, 0.35 + crownH / 2, 0));
-    if (o.hat !== 'bowler') head.add(part(0.29, 0.04, 0.29, mat('#2a1a10'), 0, 0.39, 0));
+    const crown = new THREE.Mesh(o.hat === 'bowler' ? new THREE.SphereGeometry(0.15, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2) : new THREE.CylinderGeometry(0.12, 0.15, crownH, 18), hm2);
+    crown.position.y = o.hat === 'bowler' ? 0.35 : 0.35 + crownH / 2; head.add(crown);
+    if (o.hat !== 'bowler') { const band = new THREE.Mesh(new THREE.CylinderGeometry(0.152, 0.152, 0.035, 18), mat('#2a1a10')); band.position.y = 0.38; head.add(band); }
   }
   const mkArm = (x) => {
     const g = new THREE.Group(); g.position.set(x, 0.58, 0);
@@ -137,7 +183,7 @@ export function makeHuman(o) {
   };
   const armL = mkArm(bw / 2 + 0.08), armR = mkArm(-bw / 2 - 0.08);
   root.userData = { body, hips, torso, head, neck, legL, legR, armL, armR, scale: s, gun: null, phase: Math.random() * 6 };
-  root.traverse((m) => { if (m.isMesh) m.userData.actor = root; });
+  root.traverse((m) => { if (m.isMesh) { m.userData.actor = root; m.castShadow = true; } });
   return root;
 }
 
@@ -265,7 +311,7 @@ export function animHorse(h, speed, dt) {
 
 // PERSONAGES
 export const CAST = {
-  shane: { photo: 'img/shane-face.png', skin: '#e2b59a', hair: 'bun', hairColor: '#4a2a16', shirt: '#1c1c1e', pants: '#2b2b30', coat: '#2a2320', long: true, bandana: '#7a1a1a', beard: false },
+  shane: { photo: 'img/shane-face.png', skin: '#d6a184', hair: 'bun', hairColor: '#4a2a16', shirt: '#1c1c1e', pants: '#2b2b30', coat: '#2a2320', long: true, bandana: '#7a1a1a', beard: false },
   tex: { skin: '#e8b08a', hair: 'short', hairColor: '#7a3a18', bigBeard: true, beardColor: '#8a4420', hat: 'stetson', hatColor: '#e8e0cc', shirt: '#b84a3a', pants: '#3a4a6a', vest: '#5a3a22', scale: 1.22, belly: true, thickBrow: true },
   mo: { skin: '#b07850', hair: 'curly', hairColor: '#120c08', beard: true, beardColor: '#120c08', thickBrow: true, brow: '#120c08', shirt: '#efe8dc', vest: '#7a1424', pants: '#1a1a1a', hat: 'cowboy', hatColor: '#151515', chain: true },
   bartender: { skin: '#e0b090', hair: 'bald', stache: true, beardColor: '#5a3a1a', shirt: '#f0ece0', vest: '#2a2a2a', pants: '#2a2a2a' },
