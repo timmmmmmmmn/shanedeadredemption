@@ -12,6 +12,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const MAXHP = 200;   // Shane kan veel meer hebben
+const PDMG = 1.6;    // en doet veel meer schade
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
 // =====================================================================
@@ -221,7 +223,7 @@ function makeRain() {
 //  speler
 // =====================================================================
 const P = {
-  pos: V3(), vel: V3(), yaw: 0, pitch: 0, hp: 100, dmgT: 99, crouch: 0, crouchOn: false, aim: 0, weapon: 'revolver',
+  pos: V3(), vel: V3(), yaw: 0, pitch: 0, hp: MAXHP, dmgT: 99, crouch: 0, crouchOn: false, aim: 0, weapon: 'revolver',
   ammo: {}, owned: [], cool: 0, reload: 0, model: null, de: 100, shotT: 99, melee: 0, throwA: 0, shoulder: 1, face: 0,
   y: 0, dead: false, deadT: 0, sprint: false, stepT: 0,
 };
@@ -335,7 +337,7 @@ function updatePlayer(dt, dtr) {
   }
   mouse.wheel = 0;
   // genezen
-  if (P.dmgT > 4 && P.hp < 100) P.hp = Math.min(100, P.hp + dt * 16);
+  if (P.dmgT > 2.5 && P.hp < MAXHP) P.hp = Math.min(MAXHP, P.hp + dt * 35);
   animHuman(P.model, {
     speed: G.ride ? 0 : speed, aim: Math.max(P.aim, P.shotT < 1.2 ? 1 : 0) * (W.melee || W.throwable ? 0 : 1), pitch: P.pitch,
     crouch: P.crouch, ride: !!G.ride?.horse, melee: P.melee, throwing: P.throwA ? 1 - P.throwA : 0,
@@ -425,7 +427,7 @@ function shootRay(o, d, W, from, showTracer = true, forced) {
   if (er.e) {
     const dist = from.distanceTo(p);
     const fall = clamp(1 - Math.max(0, dist - (W.falloff || 999)) / (W.pellets ? 15 : 40), 0.2, 1);
-    let dmg = W.dmg * fall * (er.head ? W.head : 1);
+    let dmg = W.dmg * PDMG * fall * (er.head ? W.head : 1);
     damageEnemy(er.e, dmg, d, er.head, p);
     return true;
   }
@@ -456,7 +458,7 @@ function knifeAttack() {
     setTimeout(() => {
       if (!best.alive) return;
       sfx('stab', 1);
-      damageEnemy(best, WEAPONS.knife.dmg, V3(dx / d, 0, dz / d), false, V3(best.pos.x, best.y0 + 1.2, best.pos.z), true);
+      damageEnemy(best, WEAPONS.knife.dmg * PDMG, V3(dx / d, 0, dz / d), false, V3(best.pos.x, best.y0 + 1.2, best.pos.z), true);
     }, 90);
   }
 }
@@ -526,10 +528,10 @@ function explode(p, owner) {
     const d = Math.hypot(e.pos.x - p.x, e.pos.z - p.z, (e.y0 + 1) - p.y);
     if (d < R) {
       const dir = V3(e.pos.x - p.x, 0, e.pos.z - p.z).normalize();
-      damageEnemy(e, WEAPONS.dynamite.dmg * (1 - d / R * 0.75) * (owner ? 0.5 : 1), dir, false, V3(e.pos.x, e.y0 + 1, e.pos.z), false, true);
+      damageEnemy(e, WEAPONS.dynamite.dmg * (owner ? 0.5 : PDMG) * (1 - d / R * 0.75), dir, false, V3(e.pos.x, e.y0 + 1, e.pos.z), false, true);
     }
   }
-  if (dpl < R * 0.95 && !P.dead) hurtPlayer((owner ? 75 : 55) * (1 - dpl / R * 0.8), p);
+  if (dpl < R * 0.95 && !P.dead) hurtPlayer((owner ? 60 : 25) * (1 - dpl / R * 0.8), p);
 }
 
 // =====================================================================
@@ -561,7 +563,7 @@ function updatePickups(dt) {
         if (P.owned.includes('dynamite') && Math.random() < 0.3) P.ammo.dynamite.res = Math.min(6, P.ammo.dynamite.res + 1);
         toast('Munitie', '', 0.9);
       } else if (k.kind === 'tonic') {
-        P.hp = Math.min(100, P.hp + 60); P.de = Math.min(100, P.de + 35);
+        P.hp = Math.min(MAXHP, P.hp + 120); P.de = Math.min(100, P.de + 50);
         toast('Health Tonic', '+ leven, + Dead Eye', 1.2);
       } else if (k.kind === 'dyn') {
         if (P.ammo.dynamite) P.ammo.dynamite.res = Math.min(6, P.ammo.dynamite.res + 2);
@@ -578,7 +580,7 @@ function updatePickups(dt) {
 // =====================================================================
 function hurtPlayer(dmg, from) {
   if (P.dead || G.god || G.mode === 'cut' || G.mode === 'done') return;
-  dmg *= [0.55, 1, 1.45][save.set.diff] ?? 1;
+  dmg *= [0.4, 0.75, 1.15][save.set.diff] ?? 0.75;
   P.hp -= dmg; P.dmgT = 0;
   G.stats.taken += dmg;
   sfx('hurt', clamp(dmg / 25, 0.3, 1));
@@ -600,11 +602,11 @@ function spawnEnemy(code, x, z, o = {}) {
   scene.add(model);
   const lvl = G.li;
   const e = {
-    code, def, model, alive: true, hp: def.hp * (o.boss ? 1 : 1 + lvl * 0.012), pos: V3(x, 0, z), y0: o.y || 0,
+    code, def, model, alive: true, hp: def.hp * (o.boss ? 0.7 : 0.85), pos: V3(x, 0, z), y0: o.y || 0,
     yaw: Math.PI * 0, scale: look.scale || 1, state: 'move', goal: null, repath: rand(0.5, 2), shootT: rand(1.2, 2.6), aimT: 0, burst: 0,
     crouch: 0, crouchOn: false, coverT: 0, stagger: 0, deadT: 0, see: false, seeT: 0, speed: def.speed * rand(0.9, 1.1),
     name: o.name || null, boss: o.boss || null, lastPos: V3(x, 0, z), stuckT: 0, melee: 0, throwT: rand(2, 5),
-    rider: null, flee: false, duel: !!o.duel, dmgMul: o.boss ? 1 : 0.8 + lvl * 0.025, acc: def.acc * (0.92 + lvl * 0.01), perch: !!def.perch || !!o.perch,
+    rider: null, flee: false, duel: !!o.duel, dmgMul: (o.boss ? 0.75 : 0.55 + lvl * 0.012), acc: def.acc * (0.72 + lvl * 0.006), perch: !!def.perch || !!o.perch,
     vel: V3(), drawn: !o.duel, lineT: rand(4, 8), adds: 0,
   };
   e.maxHp = e.hp;
@@ -640,13 +642,13 @@ function killEnemy(e, dir, head, melee, boom) {
   if (head) G.stats.heads++;
   if (melee) G.stats.melee++;
   G.bounty += head ? 12 : 6;
-  P.de = Math.min(100, P.de + (head ? 9 : 5));
+  P.de = Math.min(100, P.de + (head ? 15 : 9));
   if (e.rider) {
     // paard rent door
     e.rider.loose = true;
     e.fly.y = 2;
   }
-  if (!e.duel && !e.rider && Math.random() < (P.hp < 50 ? 0.6 : 0.45)) spawnPickup(Math.random() < 0.12 ? 'tonic' : Math.random() < 0.08 && P.owned.includes('dynamite') ? 'dyn' : 'ammo', e.pos.x, e.pos.z);
+  if (!e.duel && !e.rider && Math.random() < (P.hp < MAXHP / 2 ? 0.75 : 0.55)) spawnPickup(Math.random() < 0.12 ? 'tonic' : Math.random() < 0.08 && P.owned.includes('dynamite') ? 'dyn' : 'ammo', e.pos.x, e.pos.z);
   G.corpses.push(e);
   if (G.corpses.length > 16) { const c = G.corpses.shift(); removeEnemy(c); }
 }
@@ -777,10 +779,10 @@ function updateEnemy(e, dt) {
       }
     } else if (e.burst > 0) {
       e.burstT -= dt;
-      if (e.burstT <= 0) { enemyShoot(e, dist); e.burst--; e.burstT = 0.22; if (e.burst <= 0) e.shootT = def.rate * rand(0.8, 1.35); }
+      if (e.burstT <= 0) { enemyShoot(e, dist); e.burst--; e.burstT = 0.22; if (e.burst <= 0) e.shootT = def.rate * rand(1.1, 1.7); }
     } else if (e.shootT <= 0 && e.see && inRange && e.stagger <= 0 && !P.dead && !e.flee && G.mode === 'play') {
       if (e.crouchOn && !e.perch && Math.random() < 0.5) { e.crouchOn = false; e.shootT = 0.4; }
-      else e.aimT = def.throws ? 0.6 : 0.45;
+      else e.aimT = def.throws ? 0.8 : 0.65;
     } else if (e.shootT <= 0 && !e.see) e.shootT = 0.4;
   }
   if (e.stagger > 0) speed *= 0.3;
@@ -827,7 +829,7 @@ function enemyShoot(e, dist) {
   if (G.de && G.de.active) hit *= 0.5;
   if (G.ride) hit *= 0.75;
   if (e.rider) hit *= 0.8;
-  if (P.dmgT < 0.6) hit *= 0.7; // niet alles tegelijk
+  if (P.dmgT < 0.8) hit *= 0.6; // niet alles tegelijk
   const blocked = !G.world.los(from, tgt);
   if (!blocked && Math.random() < hit) {
     let dmg = e.def.dmg * e.dmgMul;
@@ -934,7 +936,7 @@ function updateDeadEye(dtr) {
   const de = G.de;
   if (!de) return;
   if (!de.firing) {
-    P.de -= dtr * 11;
+    P.de -= dtr * 7;
     de.beat -= dtr;
     if (de.beat <= 0) { de.beat = 0.75; sfx('heart', 0.8); }
     if (mouse.lPressed) deadEyeMark();
@@ -959,7 +961,7 @@ function updateDeadEye(dtr) {
       G.stats.hits++;
       const dist = mp.distanceTo(tp);
       const fall = clamp(1 - Math.max(0, dist - (W.falloff || 999)) / (W.pellets ? 15 : 40), 0.35, 1);
-      const dmg = W.dmg * (W.pellets ? W.pellets * 0.85 : 1) * (mk.head ? W.head : 1.15) * fall;
+      const dmg = W.dmg * PDMG * (W.pellets ? W.pellets * 0.85 : 1) * (mk.head ? W.head : 1.15) * fall;
       damageEnemy(mk.e, dmg, d, mk.head, tp);
     } else tracer(mp, tp);
     de.fireT = 0.14;
@@ -1083,7 +1085,7 @@ function objective(text, pos) { G.obj = { text, pos: pos || null }; $('#obj').te
 function aliveFoes() { return G.enemies.filter((e) => e.alive && !e.flee && !e.duel); }
 function saveCheckpoint(i) {
   G.cp = {
-    i, pos: P.pos.clone(), yaw: P.yaw, hp: 100, owned: [...P.owned], weapon: P.weapon, de: Math.max(P.de, 40),
+    i, pos: P.pos.clone(), yaw: P.yaw, hp: MAXHP, owned: [...P.owned], weapon: P.weapon, de: Math.max(P.de, 40),
     ammo: JSON.parse(JSON.stringify(P.ammo)), bounty: G.bounty,
   };
 }
@@ -1302,7 +1304,7 @@ function bossThink(e, dt, dist) {
     e.meleeCD = (e.meleeCD || 0) - dt;
     if (dist < 2 && e.meleeCD <= 0 && !P.dead) {
       e.meleeCD = 1.4; e.melee = 1;
-      setTimeout(() => { if (e.alive && Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z) < 2.5) { sfx('stab'); hurtPlayer(30, e.pos); } }, 250);
+      setTimeout(() => { if (e.alive && Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z) < 2.5) { sfx('stab'); hurtPlayer(18, e.pos); } }, 250);
     }
   }
   const waves = e.waves || [];
@@ -1636,7 +1638,7 @@ async function startLevel(li) {
   hideScreens();
   document.body.classList.add('ingame');
   buildLevel(li);
-  P.dead = false; P.deadT = 0; P.hp = 100; P.de = 100; P.reload = 0; P.cool = 0; P.crouchOn = false; P.crouch = 0; P.aim = 0;
+  P.dead = false; P.deadT = 0; P.hp = MAXHP; P.de = 100; P.reload = 0; P.cool = 0; P.crouchOn = false; P.crouch = 0; P.aim = 0;
   P.owned = []; P.ammo = {};
   for (const w of G.level.weapons) giveWeapon(w, true);
   P.weapon = 'revolver';
@@ -1689,7 +1691,7 @@ function restartCheckpoint() {
   const cp = G.cp;
   clearActors();
   endRide();
-  P.dead = false; P.deadT = 0; P.hp = 100; P.de = cp.de; P.reload = 0; P.cool = 0.3; P.vel.set(0, 0, 0);
+  P.dead = false; P.deadT = 0; P.hp = MAXHP; P.de = cp.de; P.reload = 0; P.cool = 0.3; P.vel.set(0, 0, 0);
   P.owned = [...cp.owned]; P.ammo = JSON.parse(JSON.stringify(cp.ammo));
   P.weapon = cp.weapon;
   makePlayer();
@@ -2042,7 +2044,7 @@ function drawHud() {
     hx.lineWidth = 6; hx.strokeStyle = 'rgba(0,0,0,0.5)'; hx.beginPath(); hx.arc(rx, ry, r0, a0, a1); hx.stroke();
     hx.strokeStyle = col; hx.beginPath(); hx.arc(rx, ry, r0, a0, a0 + (a1 - a0) * clamp(v, 0, 1)); hx.stroke(); hx.lineWidth = 1;
   };
-  arc(P.hp / 100, rr + 7, P.hp < 30 ? '#e03020' : '#e8dcc4', Math.PI * 0.55, Math.PI * 1.45);
+  arc(P.hp / MAXHP, rr + 7, P.hp < MAXHP * 0.3 ? '#e03020' : '#e8dcc4', Math.PI * 0.55, Math.PI * 1.45);
   arc(P.de / 100, rr + 7, '#e8a830', Math.PI * 1.55, Math.PI * 2.45);
   hx.font = '11px "IM Fell English", serif'; hx.fillStyle = '#e8dcc4'; hx.textAlign = 'center';
   hx.fillText('LEVEN', rx - rr + 4, ry + rr + 18); hx.fillText('DEAD EYE', rx + rr - 8, ry + rr + 18);
@@ -2090,7 +2092,7 @@ function drawHud() {
     }
   }
   // rode rand bij weinig leven
-  $('#blood').style.opacity = clamp((60 - P.hp) / 60, 0, 0.85) + (P.dmgT < 0.25 ? 0.25 : 0);
+  $('#blood').style.opacity = clamp((MAXHP * 0.6 - P.hp) / (MAXHP * 0.6), 0, 0.85) + (P.dmgT < 0.25 ? 0.25 : 0);
 }
 
 // =====================================================================
