@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shane Dead Redemption</title>
+<meta name="description" content="Shane heeft twee frikandelbroodjes gestolen van de Plus. Nu staat er een premie op zijn hoofd. Een western in PS1-stijl.">
+<link rel="icon" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rye&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<canvas id="hud"></canvas>
+<div id="blood"></div>
+<div id="vignette"></div>
+<div id="bars"><i></i><i></i></div>
+<div id="fade"></div>
+<div id="objbox"><div id="obj"></div><div id="obj2"></div></div>
+<div id="subs"></div>
+<div id="toasts"></div>
+<div id="duel"></div>
+<div id="title-card"></div>
+<div id="skiphint">Enter = overslaan · Spatie = volgende</div>
+
+<div id="loading" class="screen"><h1>Laden…</h1></div>
+
+<div id="menu">
+  <div class="logo">
+    <small>Een western over twee frikandelbroodjes</small>
+    <h1>Shane <span>Dead</span> Redemption</h1>
+  </div>
+  <nav>
+    <button id="btn-continue">Verder spelen</button>
+    <button id="btn-new">Nieuw spel</button>
+    <button id="btn-chapters">Hoofdstukken</button>
+    <button id="btn-controls">Besturing</button>
+    <button id="btn-settings">Instellingen</button>
+  </nav>
+  <p class="foot">Klik in het spel om je muis te vangen · Esc = pauze</p>
+</div>
+
+<div id="chapters" class="screen hidden"><div class="panel wide">
+  <h2>Hoofdstukken</h2>
+  <div id="chapter-list"></div>
+  <button class="back">Terug</button>
+</div></div>
+
+<div id="controls" class="screen hidden"><div class="panel">
+  <h2>Besturing</h2>
+  <table>
+    <tr><td>W A S D</td><td>Lopen</td></tr>
+    <tr><td>Shift</td><td>Sprinten</td></tr>
+    <tr><td>C / Ctrl</td><td>Bukken (dekking)</td></tr>
+    <tr><td>Rechtermuis</td><td>Richten over de schouder</td></tr>
+    <tr><td>Linkermuis</td><td>Schieten / steken / gooien</td></tr>
+    <tr><td>R</td><td>Herladen</td></tr>
+    <tr><td>1 – 5 / scroll / Tab</td><td>Wapen kiezen</td></tr>
+    <tr><td>Q</td><td>Dead Eye aan/uit: klik doelen aan, Q opnieuw om te vuren</td></tr>
+    <tr><td>E</td><td>Praten</td></tr>
+    <tr><td>V</td><td>Andere schouder</td></tr>
+    <tr><td>Esc</td><td>Pauze</td></tr>
+  </table>
+  <h3>Het duel</h3>
+  <p>Wacht op de bel. Trek je te vroeg, dan ben je dood. Bij <b>DRAW!</b> gaat de tijd bijna stil:
+     klik zo snel mogelijk op je tegenstanders om ze te markeren, en druk op rechtermuis of spatie om te vuren.</p>
+  <button class="back">Terug</button>
+</div></div>
+
+<div id="settings" class="screen hidden"><div class="panel">
+  <h2>Instellingen</h2>
+  <label>Muisgevoeligheid <output id="set-sens-v"></output><input id="set-sens" type="range" min="0.3" max="3" step="0.05"></label>
+  <label class="check"><input id="set-invert" type="checkbox"> Muis Y omkeren</label>
+  <label>Geluid <output id="set-sfx-v"></output><input id="set-sfx" type="range" min="0" max="1" step="0.05"></label>
+  <label>Muziek <output id="set-music-v"></output><input id="set-music" type="range" min="0" max="1" step="0.05"></label>
+  <label>Moeilijkheid <output id="set-diff-v"></output><input id="set-diff" type="range" min="0" max="2" step="1"></label>
+  <label>Beeld <output id="set-res-v"></output><input id="set-res" type="range" min="240" max="480" step="120"></label>
+  <button class="back">Terug</button>
+</div></div>
+
+<div id="pause" class="screen hidden"><div class="panel">
+  <h2>Pauze</h2>
+  <button id="btn-resume">Hervatten</button>
+  <button id="btn-retry-cp">Opnieuw vanaf checkpoint</button>
+  <button id="btn-p-controls">Besturing</button>
+  <button id="btn-p-settings">Instellingen</button>
+  <button id="btn-quit">Naar het hoofdmenu</button>
+</div></div>
+
+<div id="dead" class="screen hidden"><div class="panel center">
+  <h1 class="deadtitle">Je bent dood</h1>
+  <p id="dead-tip"></p>
+  <button id="btn-retry">Opnieuw vanaf checkpoint <small>Spatie</small></button>
+  <button id="btn-dead-menu">Hoofdmenu</button>
+</div></div>
+
+<div id="complete" class="screen hidden"><div class="panel center">
+  <div class="body"></div>
+  <button id="btn-next">Volgend hoofdstuk</button>
+  <button id="btn-done-menu">Hoofdmenu</button>
+</div></div>
+
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
